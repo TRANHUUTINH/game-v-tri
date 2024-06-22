@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bắn súng game</title>
+    <style>
+      canvas {
+        border: 1px solid black;
+        display: none; /* Ẩn canvas ban đầu */
+      }
+
+      div {
+        align-items: center;
+      }
+
+      #startButton {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 10px 20px;
+        font-size: 20px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+
+      #startButton:hover {
+        background-color: #45a049;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="startButton">Bắt đầu</button>
+
+    <div style="position: relative">
+      <video
+        id="gameVideo"
+        src="Pixel-Waterfall.mp4"
+        autoplay
+        muted
+        loop
+        width="1800px"
+        height="800px"
+        style="display: none"
+      ></video>
+      <div style="position: absolute; top: 0; left: 190px">
+        <canvas id="gameCanvas" width="1420px" height="800"></canvas>
+      </div>
+    </div>
+
+    <script>
+      let cham = new Audio();
+      cham.src = "Am-thanh-chien-thang-www_tiengdong_com.mp3";
+      let mou = new Audio();
+      mou.src = "Tieng-ban-cung-ten-www_tiengdong_com.mp3";
+      let win = new Audio();
+      win.src = "Am-thanh-thien-nhien-www_tiengdong_com.mp3";
+
+      class Player {
+        constructor(x, y) {
+          this.x = x;
+          this.y = y;
+          this.width = 100;
+          this.height = 150;
+          this.bullets = [];
+          this.image = new Image();
+          this.image.src = "skin.png";
+        }
+
+        draw(context) {
+          context.drawImage(
+            this.image,
+            this.x,
+            this.y,
+            this.width,
+            this.height
+          );
+        }
+
+        shoot(x, y) {
+          const bullet = new Bullet(
+            this.x + this.width / 2,
+            this.y + this.height / 2,
+            x,
+            y
+          );
+          this.bullets.push(bullet);
+        }
+
+        update() {
+          this.bullets.forEach((bullet) => {
+            bullet.move();
+          });
+        }
+      }
+
+      class Enemy {
+        constructor(x, y) {
+          this.x = x;
+          this.y = y;
+          this.width = 50;
+          this.height = 60;
+          this.speed = 2;
+          this.image = new Image();
+          this.image.src = "wi.png";
+          this.image.onload = () => {
+            this.loaded = true;
+          };
+        }
+
+        draw(context) {
+          if (this.loaded) {
+            context.drawImage(
+              this.image,
+              this.x,
+              this.y,
+              this.width,
+              this.height
+            );
+          }
+        }
+
+        move() {
+          this.y += this.speed;
+        }
+      }
+
+      class Bullet {
+        constructor(x, y, targetX, targetY) {
+          this.x = x;
+          this.y = y;
+          this.targetX = targetX;
+          this.targetY = targetY;
+          this.speed = 15;
+          this.distance = Math.sqrt(
+            (this.targetX - this.x) ** 2 + (this.targetY - this.y) ** 2
+          );
+          this.velX = ((this.targetX - this.x) / this.distance) * this.speed;
+          this.velY = ((this.targetY - this.y) / this.distance) * this.speed;
+          this.width = 25;
+          this.height = 25;
+          this.bulletImg = new Image();
+          this.bulletImg.src = "907-removebg-preview.png";
+          this.bulletImg.addEventListener("load", () => {
+            this.isLoaded = true;
+          });
+        }
+
+        draw(context) {
+          if (this.isLoaded) {
+            context.drawImage(
+              this.bulletImg,
+              this.x,
+              this.y,
+              this.width,
+              this.height
+            );
+          } else {
+            context.fillStyle = "yellow";
+            context.fillRect(this.x, this.y, this.width, this.height);
+          }
+        }
+
+        move() {
+          this.x += this.velX;
+          this.y += this.velY;
+        }
+      }
+
+      class Game {
+        constructor(canvas) {
+          this.canvas = canvas;
+          this.context = canvas.getContext("2d");
+          this.player = new Player(600, 600);
+          this.enemies = [];
+          this.score = 0;
+          this.gameOver = false;
+          this.timeLeft = 20;
+          this.timerId = setInterval(() => {
+            this.timeLeft--;
+            win.play();
+
+            if (this.timeLeft <= 0) {
+              clearInterval(this.timerId);
+              if (!this.gameOver) {
+                this.winGame("Bạn đã thất tình lần thứ " + this.score + ".");
+              }
+              cham.play();
+            }
+          }, 1000);
+
+          this.canvas.addEventListener("mousedown", (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            this.player.shoot(x, y);
+            mou.play();
+          });
+        }
+
+        run() {
+          this.spawnEnemies();
+          setInterval(() => {
+            if (!this.gameOver) {
+              this.update();
+              this.draw();
+            }
+          }, 1000 / 60);
+        }
+
+        spawnEnemies() {
+          const enemy = new Enemy(Math.random() * 900, -60);
+          this.enemies.push(enemy);
+          setTimeout(() => {
+            this.spawnEnemies();
+          }, Math.random() * 2000);
+        }
+
+        update() {
+          this.player.update();
+          for (let i = 0; i < this.enemies.length; i++) {
+            const enemy = this.enemies[i];
+            enemy.move();
+
+            for (let j = 0; j < this.player.bullets.length; j++) {
+              const bullet = this.player.bullets[j];
+              if (
+                bullet.x < enemy.x + enemy.width &&
+                bullet.x + bullet.width > enemy.x &&
+                bullet.y < enemy.y + enemy.height &&
+                bullet.y + bullet.height > enemy.y
+              ) {
+                this.enemies.splice(i, 1);
+                this.player.bullets.splice(j, 1);
+                this.score++;
+                break;
+              }
+            }
+
+            if (
+              this.player.x < enemy.x + enemy.width &&
+              this.player.x + this.player.width > enemy.x &&
+              this.player.y < enemy.y + enemy.height &&
+              this.player.y + this.player.height > enemy.y
+            ) {
+              this.endGame("xin chúc mừng! Bạn bị đá lần thứ " + this.score);
+            }
+
+            if (enemy.y > this.canvas.height) {
+              this.enemies.splice(i, 1);
+              i--;
+            }
+          }
+
+          if (
+            this.timeLeft <= 0 &&
+            !this.gameOver &&
+            this.enemies.length === 0
+          ) {
+            this.winGame("Bạn đã thất tình lần thứ " + this.score + ".");
+          }
+        }
+
+        draw() {
+          this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+          this.player.draw(this.context);
+          for (let i = 0; i < this.enemies.length; i++) {
+            const enemy = this.enemies[i];
+            enemy.draw(this.context);
+          }
+          for (let i = 0; i < this.player.bullets.length; i++) {
+            const bullet = this.player.bullets[i];
+            bullet.draw(this.context);
+          }
+          this.context.fillStyle = "black";
+          this.context.font = "20px Arial";
+          this.context.fillText("Điểm: " + this.score, 10, 25);
+          this.context.fillText(
+            "Thời gian: " + this.timeLeft,
+            this.canvas.width - 130,
+            25
+          );
+        }
+
+        winGame(message) {
+          clearInterval(this.timerId);
+          this.gameOver = true;
+          if (confirm(message + " Bạn có muốn thất tình tiếp không?")) {
+            this.resetGame();
+          } else {
+            this.hideGame();
+          }
+          win.play();
+        }
+
+        endGame(message) {
+          clearInterval(this.timerId);
+          this.gameOver = true;
+          if (confirm(message + " Bạn muốn chơi lại không?")) {
+            this.resetGame();
+          } else {
+            this.hideGame();
+          }
+        }
+
+        resetGame() {
+          this.score = 0;
+          this.timeLeft = 20;
+          this.player = new Player(600, 600);
+          this.enemies = [];
+          this.gameOver = false;
+          this.timerId = setInterval(() => {
+            this.timeLeft--;
+            win.play();
+
+            if (this.timeLeft <= 0) {
+              this.endGame("xin chúc mừng! Bạn bị đá lần thứ " + this.score);
+            }
+          }, 1000);
+        }
+
+        hideGame() {
+          document.getElementById("gameVideo").style.display = "none";
+          document.querySelector("canvas").style.display = "none";
+          document.getElementById("startButton").style.display = "block";
+        }
+      }
+
+      document
+        .getElementById("startButton")
+        .addEventListener("click", function () {
+          document.getElementById("gameVideo").style.display = "block";
+          document.querySelector("canvas").style.display = "block";
+
+          document.getElementById("startButton").style.display = "none";
+
+          const canvas = document.getElementById("gameCanvas");
+          const game = new Game(canvas);
+          game.run();
+        });
+    </script>
+  </body>
+</html>
